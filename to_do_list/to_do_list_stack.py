@@ -45,6 +45,6 @@ class ToDoListStack(Stack):
         # Adding prefix for Cognito domain
         user_pool.add_domain("CognitoDomain",
             cognito_domain = cognito.CognitoDomainOptions(
-                domain_prefix = "my-awesome-app"
+                domain_prefix = "hisenberg"
             )
         )
