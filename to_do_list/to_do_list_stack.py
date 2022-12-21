@@ -40,3 +40,11 @@ class ToDoListStack(Stack):
             user_pool_client_name = "todopoolclient"
             )
         user_pool_client.apply_removal_policy(RemovalPolicy.DESTROY)
+
+        # https://docs.aws.amazon.com/cdk/api/v1/python/aws_cdk.aws_cognito/CognitoDomainOptions.html
+        # Adding prefix for Cognito domain
+        user_pool.add_domain("CognitoDomain",
+            cognito_domain = cognito.CognitoDomainOptions(
+                domain_prefix = "my-awesome-app"
+            )
+        )
