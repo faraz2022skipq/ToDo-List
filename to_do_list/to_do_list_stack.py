@@ -1,6 +1,8 @@
 from aws_cdk import (
     Stack,
+    Duration,
     RemovalPolicy,
+    aws_iam as iam_,
     aws_lambda as lambda_,
     aws_cognito as cognito,
     aws_apigateway as gateway,
@@ -12,8 +14,8 @@ class ToDoListStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # https://docs.aws.amazon.com/cdk/api/v1/python/aws_cdk.aws_cognito/UserPool.html
         # Creating user pool
+        # https://docs.aws.amazon.com/cdk/api/v1/python/aws_cdk.aws_cognito/UserPool.html
         user_pool = cognito.UserPool(self, "todopool",
             user_pool_name = "todopool",
             self_sign_up_enabled = True,
@@ -24,8 +26,8 @@ class ToDoListStack(Stack):
             )
         user_pool.apply_removal_policy(RemovalPolicy.DESTROY)
         
-        # https://docs.aws.amazon.com/cdk/api/v1/python/aws_cdk.aws_cognito/UserPoolClient.html
         # App Client for userpools
+        # https://docs.aws.amazon.com/cdk/api/v1/python/aws_cdk.aws_cognito/UserPoolClient.html
         user_pool_client = cognito.UserPoolClient(self, "todopoolclient",
             user_pool = user_pool,
             auth_flows = {
@@ -34,8 +36,8 @@ class ToDoListStack(Stack):
                 'custom': True,
                 'user_srp': True},
             # Authentication flows allow users on a client to be authenticated with a user pool.
-            o_auth = cognito.OAuthSettings(flows = cognito.OAuthFlows(implicit_code_grant = True, 
-                        authorization_code_grant = True),
+            o_auth = cognito.OAuthSettings(flows = cognito.OAuthFlows(implicit_code_grant=True, 
+                        authorization_code_grant=True),
                 callback_urls = ["http://localhost:8000/logged_in.html"],
                 logout_urls = ["http://localhost:8000/index.html"]),
             supported_identity_providers = [cognito.UserPoolClientIdentityProvider.COGNITO],
@@ -43,28 +45,62 @@ class ToDoListStack(Stack):
             )
         user_pool_client.apply_removal_policy(RemovalPolicy.DESTROY)
 
-        auth = gateway.CognitoUserPoolsAuthorizer(self, 'CognitoAuthorizer', cognito_user_pools=[user_pool])
-
-        # https://docs.aws.amazon.com/cdk/api/v1/python/aws_cdk.aws_cognito/CognitoDomainOptions.html
         # Adding prefix for Cognito domain
+        # https://docs.aws.amazon.com/cdk/api/v1/python/aws_cdk.aws_cognito/CognitoDomainOptions.html
         user_pool.add_domain("CognitoDomain",
             cognito_domain = cognito.CognitoDomainOptions(
                 domain_prefix = "hisenberg"
             )
         )
 
-        # Defining my create_lembda function
-        # https://docs.aws.amazon.com/cdk/api/v1/python/aws_cdk.aws_lambda/README.html
-        def create_lambda(self, id_, path, handler, role):
-            '''
-                This will take my desired action of Lambda function performing code 
-                and will deploy it on cloud
-            '''
-            return lambda_.Function(self,
-                id = id_,
-                code = lambda_.Code.from_asset(path),
-                handler = handler,
-                runtime = lambda_.Runtime.PYTHON_3_8,
-                role = role,
-                timeout = Duration.seconds(15)
+        # Cognito user pools based custom authorizer
+        # https://docs.aws.amazon.com/cdk/api/v1/python/aws_cdk.aws_apigateway/CognitoUserPoolsAuthorizer.html
+        auth = gateway.CognitoUserPoolsAuthorizer(self, 'CognitoAuthorizer', cognito_user_pools=[user_pool])
+
+        # Calling role funtion that will give Lambda "full cloudwatch access"
+        lambda_role = self.apiLambdaRole()
+        # Creating my API Lambda
+        API_lambda = self.create_lambda("apiLambda", "./resources", "apiLambda.lambda_handler", lambda_role)
+        # Applying removal policy to destroy instance
+        API_lambda.apply_removal_policy(RemovalPolicy.DESTROY)
+
+        #REST API
+        api = gateway.LambdaRestApi(self, "todoAPI",
+            handler = API_lambda,
+            proxy = False
             )
+        
+        list = api.root.add_resource("list")
+        list.add_method("GET", authorization_type = gateway.AuthorizationType.COGNITO,
+            authorizer = auth)
+        
+
+    # Defining role for my lambda function
+    # https://docs.aws.amazon.com/cdk/api/v1/python/aws_cdk.aws_iam/Role.html
+    def apiLambdaRole(self):
+        '''
+            This will give out Lambda full access to publish on cloudwatch
+        '''
+        apiLambda_role = iam_.Role(self, "apiLambda Role",
+            assumed_by = iam_.ServicePrincipal("lambda.amazonaws.com"),
+            managed_policies = [
+                    iam_.ManagedPolicy.from_aws_managed_policy_name("AmazonAPIGatewayInvokeFullAccess")
+            ])
+        return apiLambda_role
+
+
+    # Defining my create_lembda function
+    # https://docs.aws.amazon.com/cdk/api/v1/python/aws_cdk.aws_lambda/README.html
+    def create_lambda(self, id_, path, handler, role):
+        '''
+            This will take my desired action of Lambda function performing code 
+            and will deploy it on cloud
+        '''
+        return lambda_.Function(self,
+            id = id_,
+            code = lambda_.Code.from_asset(path),
+            handler = handler,
+            runtime = lambda_.Runtime.PYTHON_3_8,
+            role = role,
+            timeout = Duration.seconds(15)
+        )
