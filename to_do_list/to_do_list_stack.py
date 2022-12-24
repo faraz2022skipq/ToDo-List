@@ -1,7 +1,9 @@
 from aws_cdk import (
     Stack,
     RemovalPolicy,
-    aws_cognito as cognito
+    aws_lambda as lambda_,
+    aws_cognito as cognito,
+    aws_apigateway as gateway,
 )
 from constructs import Construct
 
@@ -15,7 +17,7 @@ class ToDoListStack(Stack):
         user_pool = cognito.UserPool(self, "todopool",
             user_pool_name = "todopool",
             self_sign_up_enabled = True,
-            sign_in_aliases = cognito.SignInAliases(username=True, email=True),
+            sign_in_aliases = cognito.SignInAliases(email=True),
             auto_verify = cognito.AutoVerifiedAttrs(email=True, phone=True),
             password_policy = cognito.PasswordPolicy(min_length=6),
             account_recovery = cognito.AccountRecovery.EMAIL_ONLY
@@ -41,6 +43,8 @@ class ToDoListStack(Stack):
             )
         user_pool_client.apply_removal_policy(RemovalPolicy.DESTROY)
 
+        auth = gateway.CognitoUserPoolsAuthorizer(self, 'CognitoAuthorizer', cognito_user_pools=[user_pool])
+
         # https://docs.aws.amazon.com/cdk/api/v1/python/aws_cdk.aws_cognito/CognitoDomainOptions.html
         # Adding prefix for Cognito domain
         user_pool.add_domain("CognitoDomain",
@@ -48,3 +52,19 @@ class ToDoListStack(Stack):
                 domain_prefix = "hisenberg"
             )
         )
+
+        # Defining my create_lembda function
+        # https://docs.aws.amazon.com/cdk/api/v1/python/aws_cdk.aws_lambda/README.html
+        def create_lambda(self, id_, path, handler, role):
+            '''
+                This will take my desired action of Lambda function performing code 
+                and will deploy it on cloud
+            '''
+            return lambda_.Function(self,
+                id = id_,
+                code = lambda_.Code.from_asset(path),
+                handler = handler,
+                runtime = lambda_.Runtime.PYTHON_3_8,
+                role = role,
+                timeout = Duration.seconds(15)
+            )
