@@ -73,6 +73,12 @@ class ToDoListStack(Stack):
         list = api.root.add_resource("list")
         list.add_method("GET", authorization_type = gateway.AuthorizationType.COGNITO,
             authorizer = auth)
+        list.add_method("POST", authorization_type = gateway.AuthorizationType.COGNITO,
+            authorizer = auth)
+        list.add_method("PUT", authorization_type = gateway.AuthorizationType.COGNITO,
+            authorizer = auth)
+        list.add_method("DELETE", authorization_type = gateway.AuthorizationType.COGNITO,
+            authorizer = auth)
         
 
     # Defining role for my lambda function
