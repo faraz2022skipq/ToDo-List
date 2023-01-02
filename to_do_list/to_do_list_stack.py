@@ -2,6 +2,7 @@ from aws_cdk import (
     Stack,
     Duration,
     RemovalPolicy,
+    core as cdk,
     aws_iam as iam_,
     aws_lambda as lambda_,
     aws_cognito as cognito,
@@ -37,7 +38,7 @@ class ToDoListStack(Stack):
                 'user_srp': True},
             # Authentication flows allow users on a client to be authenticated with a user pool.
             o_auth = cognito.OAuthSettings(flows = cognito.OAuthFlows(implicit_code_grant=True, 
-                        authorization_code_grant=True),
+                        authorization_code_grant=False),
                 callback_urls = ["http://localhost:8000/logged_in.html"],
                 logout_urls = ["http://localhost:8000/index.html"]),
             supported_identity_providers = [cognito.UserPoolClientIdentityProvider.COGNITO],
@@ -52,7 +53,9 @@ class ToDoListStack(Stack):
                 domain_prefix = "hisenberg"
             )
         )
-
+        """
+                From here on API integration & Lambda is coded
+        """
         # Cognito user pools based custom authorizer
         # https://docs.aws.amazon.com/cdk/api/v1/python/aws_cdk.aws_apigateway/CognitoUserPoolsAuthorizer.html
         auth = gateway.CognitoUserPoolsAuthorizer(self, 'CognitoAuthorizer', cognito_user_pools=[user_pool])
@@ -79,7 +82,9 @@ class ToDoListStack(Stack):
             authorizer = auth)
         list.add_method("DELETE", authorization_type = gateway.AuthorizationType.COGNITO,
             authorizer = auth)
-        
+
+        cdk.CfnOutput(self, 'UserPoolId', value=user_pool.user_pool_id)
+        cdk.CfnOutput(self, 'UserPoolClientId', value=user_pool_client.user_pool_client_id)
 
     # Defining role for my lambda function
     # https://docs.aws.amazon.com/cdk/api/v1/python/aws_cdk.aws_iam/Role.html
@@ -90,10 +95,10 @@ class ToDoListStack(Stack):
         apiLambda_role = iam_.Role(self, "apiLambda Role",
             assumed_by = iam_.ServicePrincipal("lambda.amazonaws.com"),
             managed_policies = [
-                    iam_.ManagedPolicy.from_aws_managed_policy_name("AmazonAPIGatewayInvokeFullAccess")
+                    iam_.ManagedPolicy.from_aws_managed_policy_name("AmazonAPIGatewayInvokeFullAccess"),
+                    iam_.ManagedPolicy.from_aws_managed_policy_name("CloudWatchFullAccess")
             ])
         return apiLambda_role
-
 
     # Defining my create_lembda function
     # https://docs.aws.amazon.com/cdk/api/v1/python/aws_cdk.aws_lambda/README.html
