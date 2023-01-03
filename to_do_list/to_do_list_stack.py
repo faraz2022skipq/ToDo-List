@@ -2,7 +2,7 @@ from aws_cdk import (
     Stack,
     Duration,
     RemovalPolicy,
-    core as cdk,
+    # core as cdk,
     aws_iam as iam_,
     aws_lambda as lambda_,
     aws_cognito as cognito,
@@ -67,10 +67,12 @@ class ToDoListStack(Stack):
         # Applying removal policy to destroy instance
         API_lambda.apply_removal_policy(RemovalPolicy.DESTROY)
 
-        #REST API
+        # REST API
+        # https://docs.aws.amazon.com/cdk/api/v1/python/aws_cdk.aws_apigateway/LambdaRestApi.html
         api = gateway.LambdaRestApi(self, "todoAPI",
             handler = API_lambda,
-            proxy = False
+            proxy = False,
+            cloud_watch_role = True
             )
         
         list = api.root.add_resource("list")
@@ -82,9 +84,6 @@ class ToDoListStack(Stack):
             authorizer = auth)
         list.add_method("DELETE", authorization_type = gateway.AuthorizationType.COGNITO,
             authorizer = auth)
-
-        cdk.CfnOutput(self, 'UserPoolId', value=user_pool.user_pool_id)
-        cdk.CfnOutput(self, 'UserPoolClientId', value=user_pool_client.user_pool_client_id)
 
     # Defining role for my lambda function
     # https://docs.aws.amazon.com/cdk/api/v1/python/aws_cdk.aws_iam/Role.html
